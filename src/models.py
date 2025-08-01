@@ -5,33 +5,33 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
-# Association tables using core Column objects
+# Association tables with ON DELETE rules
 user_planet_favorites = Table(
     'user_planet_favorites',
     db.Model.metadata,
-    Column('user_id', Integer, ForeignKey('user.id'), primary_key=True),
-    Column('planet_id', Integer, ForeignKey('planet.id'), primary_key=True),
+    Column('user_id', Integer, ForeignKey('user.id', ondelete='CASCADE'), primary_key=True),
+    Column('planet_id', Integer, ForeignKey('planet.id', ondelete='CASCADE'), primary_key=True),
 )
 
 user_character_favorites = Table(
     'user_character_favorites',
     db.Model.metadata,
-    Column('user_id', Integer, ForeignKey('user.id'), primary_key=True),
-    Column('character_id', Integer, ForeignKey('character.id'), primary_key=True),
+    Column('user_id', Integer, ForeignKey('user.id', ondelete='CASCADE'), primary_key=True),
+    Column('character_id', Integer, ForeignKey('character.id', ondelete='CASCADE'), primary_key=True),
 )
 
 user_vehicle_favorites = Table(
     'user_vehicle_favorites',
     db.Model.metadata,
-    Column('user_id', Integer, ForeignKey('user.id'), primary_key=True),
-    Column('vehicle_id', Integer, ForeignKey('vehicle.id'), primary_key=True),
+    Column('user_id', Integer, ForeignKey('user.id', ondelete='CASCADE'), primary_key=True),
+    Column('vehicle_id', Integer, ForeignKey('vehicle.id', ondelete='CASCADE'), primary_key=True),
 )
 
 character_vehicle_association = Table(
     'character_vehicle_association',
     db.Model.metadata,
-    Column('character_id', Integer, ForeignKey('character.id'), primary_key=True),
-    Column('vehicle_id', Integer, ForeignKey('vehicle.id'), primary_key=True),
+    Column('character_id', Integer, ForeignKey('character.id', ondelete='CASCADE'), primary_key=True),
+    Column('vehicle_id', Integer, ForeignKey('vehicle.id', ondelete='CASCADE'), primary_key=True),
 )
 
 class User(db.Model):
@@ -48,22 +48,16 @@ class User(db.Model):
     is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
 
     favorite_planets = relationship(
-        'Planet',
-        secondary=user_planet_favorites,
-        back_populates='fans',
+        'Planet', secondary=user_planet_favorites, back_populates='fans', passive_deletes=True
     )
     favorite_characters = relationship(
-        'Character',
-        secondary=user_character_favorites,
-        back_populates='fans',
+        'Character', secondary=user_character_favorites, back_populates='fans', passive_deletes=True
     )
     favorite_vehicles = relationship(
-        'Vehicle',
-        secondary=user_vehicle_favorites,
-        back_populates='fans',
+        'Vehicle', secondary=user_vehicle_favorites, back_populates='fans', passive_deletes=True
     )
 
-    posts = relationship('Post', back_populates='author')
+    posts = relationship('Post', back_populates='author', passive_deletes=True)
 
     def serialize(self):
         return {
@@ -84,11 +78,11 @@ class Planet(db.Model):
     population: Mapped[str] = mapped_column(String(50))
 
     fans = relationship(
-        'User',
-        secondary=user_planet_favorites,
-        back_populates='favorite_planets',
+        'User', secondary=user_planet_favorites, back_populates='favorite_planets', passive_deletes=True
     )
-    residents = relationship('Character', back_populates='origin_planet')
+    residents = relationship(
+        'Character', back_populates='origin_planet', cascade='all, delete-orphan', passive_deletes=True
+    )
 
     def serialize(self):
         return {
@@ -107,19 +101,17 @@ class Character(db.Model):
     gender: Mapped[str] = mapped_column(String(20))
     birth_year: Mapped[str] = mapped_column(String(20))
     origin_planet_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey('planet.id'), nullable=True
+        Integer, ForeignKey('planet.id', ondelete='SET NULL'), nullable=True
     )
-    origin_planet = relationship('Planet', back_populates='residents')
+    origin_planet = relationship(
+        'Planet', back_populates='residents', passive_deletes=True
+    )
 
     fans = relationship(
-        'User',
-        secondary=user_character_favorites,
-        back_populates='favorite_characters',
+        'User', secondary=user_character_favorites, back_populates='favorite_characters', passive_deletes=True
     )
     vehicles = relationship(
-        'Vehicle',
-        secondary=character_vehicle_association,
-        back_populates='pilots',
+        'Vehicle', secondary=character_vehicle_association, back_populates='pilots', passive_deletes=True
     )
 
     def serialize(self):
@@ -145,14 +137,10 @@ class Vehicle(db.Model):
     vehicle_class: Mapped[str] = mapped_column(String(50))
 
     fans = relationship(
-        'User',
-        secondary=user_vehicle_favorites,
-        back_populates='favorite_vehicles',
+        'User', secondary=user_vehicle_favorites, back_populates='favorite_vehicles', passive_deletes=True
     )
     pilots = relationship(
-        'Character',
-        secondary=character_vehicle_association,
-        back_populates='vehicles',
+        'Character', secondary=character_vehicle_association, back_populates='vehicles', passive_deletes=True
     )
 
     def serialize(self):
@@ -174,11 +162,9 @@ class Post(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('user.id'), nullable=False)
-    author = relationship('User', back_populates='posts')
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    author = relationship('User', back_populates='posts', passive_deletes=True)
 
     def serialize(self):
         return {
